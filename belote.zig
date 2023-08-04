@@ -64,16 +64,26 @@ pub fn draw_cards(d: *Deck, ha: *Hand, nb: u32) void {
 pub fn print_deck(d: Deck) !void {
     try STDOUT.print("nb={d}\n", .{d.nb});
     for (0..d.nb) |i| {
-        try STDOUT.print("{d} {d}\n", .{ d.t[i].c, d.t[i].h });
+        try STDOUT.print("({d},{d}) ", .{ d.t[i].c, d.t[i].h });
     }
+    try STDOUT.print("\n", .{});
 }
 
 pub fn print_hand(ha: Hand) !void {
     for (ha.nb, 0..) |v, i| {
-        try STDOUT.print("nb={d}\n", .{v});
+        try STDOUT.print("{d}: ", .{i});
         for (0..v) |j| {
-            try STDOUT.print("{d}\n", .{ha.t[i][j]});
+            try STDOUT.print("{d} ", .{ha.t[i][j]});
         }
+        try STDOUT.print("\n", .{});
+    }
+}
+
+pub fn print_game(g: Game) !void {
+    var names = [_][]const u8{ "N", "E", "S", "O" };
+    for (g, 0..) |v, i| {
+        try STDOUT.print("{s}\n", .{names[i]});
+        try print_hand(v);
     }
 }
 
@@ -84,6 +94,7 @@ const Depth = u8;
 const Nump = u8;
 const Toplay = struct { nb: usize, t: [NB_CARDS]struct { c: u8, i: usize } };
 var gd: Game = undefined;
+var exact: bool = true;
 
 fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth) Vals {
     var a = alpha;
@@ -151,6 +162,7 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
             }
         }
     }
+
     var g: Vals = if (nump % 2 == 0) VALS_MIN else VALS_MAX;
     var i: usize = 0;
     while ((a < b) and (i < vl.nb)) {
@@ -200,7 +212,7 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
                     nscore2 += 10;
                 }
             }
-            if ((nscore1 > 81) or (nscore2 > 81) or (depth == 1)) {
+            if (((!exact) and ((nscore1 > 81) or (nscore2 > 81))) or (depth == 1)) {
                 ha.nb[c] += 1;
                 ha.t[c][vl.t[i].i] = h;
                 return nscore1 - nscore2;
@@ -231,6 +243,7 @@ pub fn main() !void {
     }
     try print_hand(gd[0]);
     try print_deck(d);
+    try print_game(gd);
     var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32);
     try STDOUT.print("res={d}\n", .{res});
 }
