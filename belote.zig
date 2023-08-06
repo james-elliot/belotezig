@@ -97,6 +97,9 @@ var gd: Game = undefined;
 var exact: bool = true;
 
 fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth) Vals {
+    //    print_game(gd) catch std.os.exit(255);
+    //    STDOUT.print("\n", .{}) catch std.os.exit(255);
+
     var a = alpha;
     var b = beta;
     var ha: *Hand = &gd[nump];
@@ -202,22 +205,25 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
             var nscore1: Vals = score1;
             var nscore2: Vals = score2;
             if (hplay % 2 == 0) {
-                nscore1 += c_val;
+                nscore1 += nc_val;
                 if (depth == 1) {
                     nscore1 += 10;
                 }
             } else {
-                nscore2 += c_val;
+                nscore2 += nc_val;
                 if (depth == 1) {
                     nscore2 += 10;
                 }
             }
-            if (((!exact) and ((nscore1 > 81) or (nscore2 > 81))) or (depth == 1)) {
-                ha.nb[c] += 1;
-                ha.t[c][vl.t[i].i] = h;
-                return nscore1 - nscore2;
+            if (depth == 0) {
+                STDOUT.print("nscore1={d} nscore2={d}", .{ nscore1, nscore2 }) catch std.os.exit(255);
+                std.os.exit(254);
             }
-            v = ab(a, b, 0, 0, 0, 0, false, nump, 0, nscore1, nscore2, depth - 1);
+            if (((!exact) and ((nscore1 > 81) or (nscore2 > 81))) or (depth == 1)) {
+                v = nscore1 - nscore2;
+            } else {
+                v = ab(a, b, 0, 0, 0, 0, false, nump, 0, nscore1, nscore2, depth - 1);
+            }
         }
         ha.nb[c] += 1;
         ha.t[c][vl.t[i].i] = h;
@@ -241,9 +247,7 @@ pub fn main() !void {
     for (&gd) |*h| {
         draw_cards(&d, h, NB_CARDS);
     }
-    try print_hand(gd[0]);
-    try print_deck(d);
     try print_game(gd);
-    var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32);
+    var res = ab(-10000, 10000, 0, 0, 0, 0, false, 0, 0, 0, 0, 32);
     try STDOUT.print("res={d}\n", .{res});
 }
