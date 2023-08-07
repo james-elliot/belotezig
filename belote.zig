@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const DEBUG = false;
+
 const STDOUT = std.io.getStdOut().writer();
 const ALLOCATOR = std.heap.page_allocator;
 const RNDGEN = std.rand.DefaultPrng;
@@ -38,6 +40,13 @@ const CVALS = [NB_COLORS][NB_CARDS]Vals{
     [_]Vals{ 0, 0, 0, 2, 3, 4, 10, 11 },
 };
 
+const CCARDS = [NB_COLORS][NB_CARDS]*const [2:0]u8{
+    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "D ", "R ", "10", " A", "14", "20" },
+    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
+    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
+    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
+};
+
 pub fn draw_deck(d: *Deck) void {
     var ds: Deck = FDECK;
     for (&d.t, 0..) |*v, i| {
@@ -73,10 +82,13 @@ pub fn print_hand(ha: Hand) !void {
     for (ha.nb, 0..) |v, i| {
         try STDOUT.print("{d}: ", .{i});
         for (0..v) |j| {
-            try STDOUT.print("{d} ", .{ha.t[i][j]});
+            try STDOUT.print("{s} ", .{CCARDS[i][ha.t[i][j]]});
         }
-        try STDOUT.print("\n", .{});
+        for (v..NB_CARDS) |_| {
+            try STDOUT.print("   ", .{});
+        }
     }
+    try STDOUT.print("\n", .{});
 }
 
 pub fn print_game(g: Game) !void {
@@ -94,11 +106,12 @@ const Depth = u8;
 const Nump = u8;
 const Toplay = struct { nb: usize, t: [NB_CARDS]struct { c: u8, i: usize } };
 var gd: Game = undefined;
-var exact: bool = true;
 
-fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth) Vals {
-    //    print_game(gd) catch std.os.exit(255);
-    //    STDOUT.print("\n", .{}) catch std.os.exit(255);
+fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth, exact: bool) Vals {
+    if (DEBUG) {
+        STDOUT.print("alpha={d} beta={d} col={d} hcard={d} hplay={d} c_val={d} cur={any} nump={d} nbp={d} score1={d} score2={d} depth={d}\n", .{ alpha, beta, col, hcard, hplay, c_val, cut, nump, nbp, score1, score2, depth }) catch std.os.exit(255);
+        print_game(gd) catch std.os.exit(255);
+    }
 
     var a = alpha;
     var b = beta;
@@ -166,6 +179,14 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
         }
     }
 
+    if (DEBUG) {
+        STDOUT.print("vl.nb={d}\n", .{vl.nb}) catch std.os.exit(255);
+        for (0..vl.nb) |i| {
+            STDOUT.print("({d},{d}) ", .{ vl.t[i].c, ha.t[vl.t[i].c][vl.t[i].i] }) catch std.os.exit(255);
+        }
+        STDOUT.print("\n", .{}) catch std.os.exit(255);
+    }
+
     var g: Vals = if (nump % 2 == 0) VALS_MIN else VALS_MAX;
     var i: usize = 0;
     while ((a < b) and (i < vl.nb)) {
@@ -177,6 +198,7 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
         var nhcard = hcard;
         var nhplay = hplay;
         var ncol = col;
+        var ncut: bool = cut;
         var v: Vals = undefined;
         if (nbp == 0) {
             nhcard = h;
@@ -189,22 +211,21 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
                     nhplay = nump;
                 }
             } else {
-                if ((c == col) and (h > hcard)) {
+                if (((c == col) and (h > hcard)) or (c == TRUMP)) {
                     nhcard = h;
                     nhplay = nump;
                 }
+                if ((c == TRUMP) and (col != TRUMP)) {
+                    ncut = true;
+                }
             }
         }
-        var ncut: bool = cut;
-        if ((c == TRUMP) and (col != TRUMP)) {
-            ncut = true;
-        }
         if (nbp != NB_PLAYERS - 1) {
-            v = ab(a, b, ncol, nhcard, nhplay, nc_val, ncut, (nump + 1) % NB_PLAYERS, nbp + 1, score1, score2, depth - 1);
+            v = ab(a, b, ncol, nhcard, nhplay, nc_val, ncut, (nump + 1) % NB_PLAYERS, nbp + 1, score1, score2, depth - 1, exact);
         } else {
             var nscore1: Vals = score1;
             var nscore2: Vals = score2;
-            if (hplay % 2 == 0) {
+            if (nhplay % 2 == 0) {
                 nscore1 += nc_val;
                 if (depth == 1) {
                     nscore1 += 10;
@@ -215,14 +236,13 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
                     nscore2 += 10;
                 }
             }
-            if (depth == 0) {
-                STDOUT.print("nscore1={d} nscore2={d}", .{ nscore1, nscore2 }) catch std.os.exit(255);
-                std.os.exit(254);
+            if (DEBUG) {
+                STDOUT.print("nscore1={d} nscore2={d}\n", .{ nscore1, nscore2 }) catch std.os.exit(255);
             }
             if (((!exact) and ((nscore1 > 81) or (nscore2 > 81))) or (depth == 1)) {
                 v = nscore1 - nscore2;
             } else {
-                v = ab(a, b, 0, 0, 0, 0, false, nump, 0, nscore1, nscore2, depth - 1);
+                v = ab(a, b, 0, 0, 0, 0, false, nhplay, 0, nscore1, nscore2, depth - 1, exact);
             }
         }
         ha.nb[c] += 1;
@@ -235,6 +255,9 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
             g = @min(v, g);
             b = @min(b, g);
         }
+        if (DEBUG) {
+            STDOUT.print("vl.nb={d},g={d},a={d} b={d} c={d} h={d} ncol={d} nhcard={d} nhplay={d} nc_val={d} cur={any} nump={d} nbp={d} score1={d} score2={d} depth={d}\n", .{ vl.nb, g, a, b, c, h, ncol, nhcard, nhplay, nc_val, cut, nump, nbp, score1, score2, depth }) catch std.os.exit(255);
+        }
         i += 1;
     }
     return g;
@@ -242,12 +265,14 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
 
 pub fn main() !void {
     var d: Deck = ZDECK;
+    const nb = 8;
     draw_deck(&d);
     try print_deck(d);
     for (&gd) |*h| {
-        draw_cards(&d, h, NB_CARDS);
+        //        draw_cards(&d, h, nb);
+        draw_cards(&d, h, nb);
     }
     try print_game(gd);
-    var res = ab(-10000, 10000, 0, 0, 0, 0, false, 0, 0, 0, 0, 32);
+    var res = ab(-1000, 1000, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, true);
     try STDOUT.print("res={d}\n", .{res});
 }
