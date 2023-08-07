@@ -12,8 +12,8 @@ const NB_CARDS: usize = 8;
 const ALL_CARDS: usize = NB_CARDS * NB_COLORS;
 const NB_PLAYERS = 4;
 
-const Color = u8;
-const Height = u8;
+const Color = u4;
+const Height = u4;
 const Card = packed struct { h: Height, c: Color };
 const Deck = struct { nb: u8, t: [ALL_CARDS]Card };
 const Hand = struct { nb: [NB_COLORS]u8, t: [NB_CARDS][NB_COLORS]Height };
@@ -24,6 +24,7 @@ const TRUMP: Color = 0;
 const INVALID_HEIGHT: Height = std.math.maxInt(Height);
 const ZDECK = Deck{ .nb = 0, .t = [_]Card{Card{ .h = 0, .c = 0 }} ** ALL_CARDS };
 const ZHAND = Hand{ .nb = [_]u8{0} ** NB_COLORS, .t = [_][NB_COLORS]Height{[_]Height{0} ** NB_COLORS} ** NB_CARDS };
+const ZGAME: Game = [_]Hand{ZHAND} ** NB_PLAYERS;
 const FDECK = blk: {
     var d: Deck = undefined;
     for (&d.t, 0..) |*v, i| {
@@ -104,10 +105,10 @@ const VALS_MIN: Vals = std.math.minInt(i16);
 const VALS_MAX: Vals = std.math.maxInt(i16);
 const Depth = u8;
 const Nump = u8;
-const Toplay = struct { nb: usize, t: [NB_CARDS]struct { c: u8, i: usize } };
-var gd: Game = undefined;
+const Toplay = struct { nb: usize, t: [NB_CARDS]struct { c: Color, i: usize } };
+//var gd: Game = undefined;
 
-fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth, exact: bool) Vals {
+fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Vals, cut: bool, nump: Nump, nbp: Nump, score1: Vals, score2: Vals, depth: Depth, exact: bool, gd: *Game) Vals {
     if (DEBUG) {
         STDOUT.print("alpha={d} beta={d} col={d} hcard={d} hplay={d} c_val={d} cur={any} nump={d} nbp={d} score1={d} score2={d} depth={d}\n", .{ alpha, beta, col, hcard, hplay, c_val, cut, nump, nbp, score1, score2, depth }) catch std.os.exit(255);
         print_game(gd) catch std.os.exit(255);
@@ -221,7 +222,7 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
             }
         }
         if (nbp != NB_PLAYERS - 1) {
-            v = ab(a, b, ncol, nhcard, nhplay, nc_val, ncut, (nump + 1) % NB_PLAYERS, nbp + 1, score1, score2, depth - 1, exact);
+            v = ab(a, b, ncol, nhcard, nhplay, nc_val, ncut, (nump + 1) % NB_PLAYERS, nbp + 1, score1, score2, depth - 1, exact, gd);
         } else {
             var nscore1: Vals = score1;
             var nscore2: Vals = score2;
@@ -242,7 +243,7 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
             if (((!exact) and ((nscore1 > 81) or (nscore2 > 81))) or (depth == 1)) {
                 v = nscore1 - nscore2;
             } else {
-                v = ab(a, b, 0, 0, 0, 0, false, nhplay, 0, nscore1, nscore2, depth - 1, exact);
+                v = ab(a, b, 0, 0, 0, 0, false, nhplay, 0, nscore1, nscore2, depth - 1, exact, gd);
             }
         }
         ha.nb[c] += 1;
@@ -265,14 +266,14 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
 
 pub fn main() !void {
     var d: Deck = ZDECK;
-    const nb = 8;
+    var gd: Game = ZGAME;
+    const nb = NB_CARDS;
     draw_deck(&d);
     try print_deck(d);
     for (&gd) |*h| {
-        //        draw_cards(&d, h, nb);
         draw_cards(&d, h, nb);
     }
     try print_game(gd);
-    var res = ab(-1000, 1000, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, true);
+    var res = ab(-1000, 1000, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, true, &gd);
     try STDOUT.print("res={d}\n", .{res});
 }
