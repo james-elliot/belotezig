@@ -5,7 +5,7 @@ const DEBUG = false;
 const STDOUT = std.io.getStdOut().writer();
 const ALLOCATOR = std.heap.page_allocator;
 const RNDGEN = std.rand.DefaultPrng;
-var rnd = RNDGEN.init(0);
+var rnd: std.rand.Xoshiro256 = undefined;
 
 const NB_COLORS: usize = 4;
 const NB_CARDS: usize = 8;
@@ -291,6 +291,15 @@ fn cmpByValue(context: void, a: Height, b: Height) bool {
 }
 
 pub fn main() !void {
+    var seed: u64 = 0;
+    var args = std.process.args();
+    if (args.skip()) {
+        if (args.next()) |w| {
+            seed = std.fmt.parseInt(u64, w, 10) catch 0;
+        }
+    }
+    try STDOUT.print("seed={d}\n", .{seed});
+    rnd = RNDGEN.init(seed);
     var d: Deck = ZDECK;
     var gd: Game = ZGAME;
     const nb = NB_CARDS;
@@ -303,6 +312,6 @@ pub fn main() !void {
         }
     }
     try print_game(gd);
-    var res = ab(-1000, 1000, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, true, &gd);
+    var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
     try STDOUT.print("res={d}\n", .{res});
 }
