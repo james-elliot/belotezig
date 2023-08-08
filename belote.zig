@@ -12,8 +12,8 @@ const NB_CARDS: usize = 8;
 const ALL_CARDS: usize = NB_CARDS * NB_COLORS;
 const NB_PLAYERS = 4;
 
-const Color = u4;
-const Height = u4;
+const Color = u8;
+const Height = u8;
 const Card = packed struct { h: Height, c: Color };
 const Deck = struct { nb: u8, t: [ALL_CARDS]Card };
 const Hand = struct { nb: [NB_COLORS]u8, t: [NB_CARDS][NB_COLORS]Height };
@@ -42,7 +42,7 @@ const CVALS = [NB_COLORS][NB_CARDS]Vals{
 };
 
 const CCARDS = [NB_COLORS][NB_CARDS]*const [2:0]u8{
-    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "D ", "R ", "10", " A", "14", "20" },
+    [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "D ", "R ", "10", "A ", "14", "20" },
     [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
     [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
     [NB_CARDS]*const [2:0]u8{ "7 ", "8 ", "9 ", "V ", "D ", "R ", "10", "A " },
@@ -121,11 +121,33 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
     vl.nb = 0;
 
     if (nbp == 0) { //First card of the ply, everything is valid
+        var low: [NB_COLORS]usize = [NB_COLORS]usize{ 0, 0, 0, 0 };
+        for (0..NB_COLORS) |c| {
+            var hp: usize = undefined;
+            var hv: Height = std.math.minInt(Height);
+            if (ha.nb[c] > 0) {
+                for (gd, 0..) |lha, i| {
+                    if ((lha.nb[c] > 0) and (lha.t[c][0] > hv)) {
+                        hv = lha.t[c][0];
+                        hp = i;
+                    }
+                }
+                if (((hp + nump) % 2 == 0) and (hv != std.math.minInt(Height))) {
+                    vl.t[vl.nb].c = @as(Color, @intCast(c));
+                    vl.t[vl.nb].i = 0;
+                    vl.nb += 1;
+                    low[c] = 1;
+                }
+            }
+        }
         for (ha.nb, 0..) |n, c| {
-            for (0..n) |i| {
-                vl.t[vl.nb].c = @as(Color, @intCast(c));
-                vl.t[vl.nb].i = i;
-                vl.nb += 1;
+            if (low[c] < n) {
+                for (low[c]..n) |i| {
+                    vl.t[vl.nb].c = @as(Color, @intCast(c));
+                    //                    vl.t[vl.nb].i = n - 1 - i;
+                    vl.t[vl.nb].i = i;
+                    vl.nb += 1;
+                }
             }
         }
     } else { // Not the first card
@@ -264,6 +286,10 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
     return g;
 }
 
+fn cmpByValue(context: void, a: Height, b: Height) bool {
+    return std.sort.asc(Height)(context, b, a);
+}
+
 pub fn main() !void {
     var d: Deck = ZDECK;
     var gd: Game = ZGAME;
@@ -272,6 +298,9 @@ pub fn main() !void {
     try print_deck(d);
     for (&gd) |*h| {
         draw_cards(&d, h, nb);
+        for (0..NB_COLORS) |i| {
+            std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
+        }
     }
     try print_game(gd);
     var res = ab(-1000, 1000, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, true, &gd);
