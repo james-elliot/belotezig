@@ -290,16 +290,7 @@ fn cmpByValue(context: void, a: Height, b: Height) bool {
     return std.sort.asc(Height)(context, b, a);
 }
 
-pub fn main() !void {
-    var seed: u64 = 0;
-    var args = std.process.args();
-    if (args.skip()) {
-        if (args.next()) |w| {
-            seed = std.fmt.parseInt(u64, w, 10) catch 0;
-        }
-    }
-    try STDOUT.print("seed={d}\n", .{seed});
-    rnd = RNDGEN.init(seed);
+fn test1() !void {
     var d: Deck = ZDECK;
     var gd: Game = ZGAME;
     const nb = NB_CARDS;
@@ -314,4 +305,60 @@ pub fn main() !void {
     try print_game(gd);
     var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
     try STDOUT.print("res={d}\n", .{res});
+}
+
+fn test2() !void {
+    var d: Deck = ZDECK;
+    var gd: Game = ZGAME;
+    const nb = NB_CARDS;
+    draw_deck(&d);
+    try print_deck(d);
+    for (&gd) |*h| {
+        draw_cards(&d, h, nb);
+        for (0..NB_COLORS) |i| {
+            std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
+        }
+    }
+    try print_game(gd);
+    var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
+    try STDOUT.print("res={d}\n", .{res});
+}
+
+pub fn main() !void {
+    var seed: u64 = 0;
+    var args = std.process.args();
+    if (args.skip()) {
+        if (args.next()) |w| {
+            seed = std.fmt.parseInt(u64, w, 10) catch 0;
+        }
+    }
+    try STDOUT.print("seed={d}\n", .{seed});
+    rnd = RNDGEN.init(seed);
+
+    var d: Deck = ZDECK;
+    var gd: Game = ZGAME;
+    draw_deck(&d);
+    draw_cards(&d, &gd[0], 6);
+    try print_game(gd);
+    const nb = 200;
+    var succ: u32 = 0;
+    for (0..nb) |_| {
+        var d2 = d;
+        var gd2 = gd;
+        draw_cards(&d2, &gd2[0], 2);
+        for (1..NB_COLORS) |i| {
+            draw_cards(&d2, &gd2[i], 8);
+        }
+        for (&gd2) |*h| {
+            for (0..NB_COLORS) |i| {
+                std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
+            }
+        }
+        //        try print_game(gd2);
+        var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
+        if (res > 0) succ += 1;
+        //        try STDOUT.print("res={d}\n", .{res});
+    }
+    try STDOUT.print("succ={d}\n", .{succ});
+    //    try test1();
 }
