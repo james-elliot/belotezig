@@ -16,14 +16,14 @@ const Color = u8;
 const Height = u8;
 const Card = packed struct { h: Height, c: Color };
 const Deck = struct { nb: u8, t: [ALL_CARDS]Card };
-const Hand = struct { nb: [NB_COLORS]u8, t: [NB_CARDS][NB_COLORS]Height };
+const Hand = struct { nb: [NB_COLORS]u8, t: [NB_COLORS][NB_CARDS]Height };
 const Game = [NB_PLAYERS]Hand;
 
 const INVALID_COLOR: Color = std.math.maxInt(Color);
 const TRUMP: Color = 0;
 const INVALID_HEIGHT: Height = std.math.maxInt(Height);
 const ZDECK = Deck{ .nb = 0, .t = [_]Card{Card{ .h = 0, .c = 0 }} ** ALL_CARDS };
-const ZHAND = Hand{ .nb = [_]u8{0} ** NB_COLORS, .t = [_][NB_COLORS]Height{[_]Height{0} ** NB_COLORS} ** NB_CARDS };
+const ZHAND = Hand{ .nb = [_]u8{0} ** NB_COLORS, .t = [_][NB_CARDS]Height{[_]Height{0} ** NB_CARDS} ** NB_COLORS };
 const ZGAME: Game = [_]Hand{ZHAND} ** NB_PLAYERS;
 const FDECK = blk: {
     var d: Deck = undefined;
@@ -98,6 +98,26 @@ pub fn print_game(g: Game) !void {
         try STDOUT.print("{s}\n", .{names[i]});
         try print_hand(v);
     }
+}
+
+pub fn rotate_game(g: *Game) void {
+    var ha: Hand = g[0];
+    for (0..NB_COLORS - 1) |i| {
+        g[i] = g[i + 1];
+    }
+    g[NB_COLORS - 1] = ha;
+}
+
+pub fn rotate_hand(h: *Hand) void {
+    //const Hand = struct { nb: [NB_COLORS]u8, t: [NB_COLORS][NB_CARDS]Height };
+    var n: u8 = h.nb[0];
+    var t: [NB_CARDS]Height = h.t[0];
+    for (0..NB_COLORS - 1) |i| {
+        h.nb[i] = h.nb[i + 1];
+        h.t[i] = h.t[i + 1];
+    }
+    h.nb[NB_COLORS - 1] = n;
+    h.t[NB_COLORS - 1] = t;
 }
 
 const Vals = i16;
@@ -339,26 +359,29 @@ pub fn main() !void {
     var gd: Game = ZGAME;
     draw_deck(&d);
     draw_cards(&d, &gd[0], 6);
-    try print_game(gd);
-    const nb = 200;
-    var succ: u32 = 0;
-    for (0..nb) |_| {
-        var d2 = d;
-        var gd2 = gd;
-        draw_cards(&d2, &gd2[0], 2);
-        for (1..NB_COLORS) |i| {
-            draw_cards(&d2, &gd2[i], 8);
-        }
-        for (&gd2) |*h| {
-            for (0..NB_COLORS) |i| {
-                std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
+    for (0..NB_COLORS) |_| {
+        const nb = 10;
+        var succ: u32 = 0;
+        try print_game(gd);
+        for (0..nb) |_| {
+            var d2 = d;
+            var gd2 = gd;
+            draw_cards(&d2, &gd2[0], 2);
+            for (1..NB_COLORS) |i| {
+                draw_cards(&d2, &gd2[i], 8);
             }
+            for (&gd2) |*h| {
+                for (0..NB_COLORS) |i| {
+                    std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
+                }
+            }
+            //        try print_game(gd2);
+            var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
+            if (res > 0) succ += 1;
+            //        try STDOUT.print("res={d}\n", .{res});
         }
-        //        try print_game(gd2);
-        var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
-        if (res > 0) succ += 1;
-        //        try STDOUT.print("res={d}\n", .{res});
+        try STDOUT.print("succ={d}\n", .{succ});
+        rotate_hand(&gd[0]);
     }
-    try STDOUT.print("succ={d}\n", .{succ});
     //    try test1();
 }
