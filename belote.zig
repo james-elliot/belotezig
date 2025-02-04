@@ -4,8 +4,8 @@ const DEBUG = false;
 
 const STDOUT = std.io.getStdOut().writer();
 const ALLOCATOR = std.heap.page_allocator;
-const RNDGEN = std.rand.DefaultPrng;
-var rnd: std.rand.Xoshiro256 = undefined;
+const RNDGEN = std.Random.DefaultPrng;
+var rnd: std.Random.Xoshiro256 = undefined;
 
 const NB_COLORS: usize = 4;
 const NB_CARDS: usize = 8;
@@ -51,8 +51,8 @@ const CCARDS = [NB_COLORS][NB_CARDS]*const [2:0]u8{
 pub fn draw_deck(d: *Deck) void {
     var ds: Deck = FDECK;
     for (&d.t, 0..) |*v, i| {
-        var nb: usize = ALL_CARDS - i;
-        var j: usize = rnd.random().int(usize) % nb;
+        const nb: usize = ALL_CARDS - i;
+        const j: usize = rnd.random().int(usize) % nb;
         v.* = ds.t[j];
         ds.t[j] = ds.t[nb - 1];
     }
@@ -61,9 +61,9 @@ pub fn draw_deck(d: *Deck) void {
 
 pub fn draw_cards(d: *Deck, ha: *Hand, nb: u32) void {
     for (0..nb) |_| {
-        var j: usize = rnd.random().int(usize) % d.nb;
-        var c: Color = d.t[j].c;
-        var h: Height = d.t[j].h;
+        const j: usize = rnd.random().int(usize) % d.nb;
+        const c: Color = d.t[j].c;
+        const h: Height = d.t[j].h;
         d.t[j] = d.t[d.nb - 1];
         d.nb -= 1;
         ha.t[c][ha.nb[c]] = h;
@@ -93,7 +93,7 @@ pub fn print_hand(ha: Hand) !void {
 }
 
 pub fn print_game(g: Game) !void {
-    var names = [_][]const u8{ "N", "E", "S", "O" };
+    const names = [_][]const u8{ "N", "E", "S", "O" };
     for (g, 0..) |v, i| {
         try STDOUT.print("{s}\n", .{names[i]});
         try print_hand(v);
@@ -101,7 +101,7 @@ pub fn print_game(g: Game) !void {
 }
 
 pub fn rotate_game(g: *Game) void {
-    var ha: Hand = g[0];
+    const ha: Hand = g[0];
     for (0..NB_COLORS - 1) |i| {
         g[i] = g[i + 1];
     }
@@ -110,8 +110,8 @@ pub fn rotate_game(g: *Game) void {
 
 pub fn rotate_hand(h: *Hand) void {
     //const Hand = struct { nb: [NB_COLORS]u8, t: [NB_COLORS][NB_CARDS]Height };
-    var n: u8 = h.nb[0];
-    var t: [NB_CARDS]Height = h.t[0];
+    const n: u8 = h.nb[0];
+    const t: [NB_CARDS]Height = h.t[0];
     for (0..NB_COLORS - 1) |i| {
         h.nb[i] = h.nb[i + 1];
         h.t[i] = h.t[i + 1];
@@ -233,11 +233,11 @@ fn ab(alpha: Vals, beta: Vals, col: Color, hcard: Height, hplay: Nump, c_val: Va
     var g: Vals = if (nump % 2 == 0) VALS_MIN else VALS_MAX;
     var i: usize = 0;
     while ((a < b) and (i < vl.nb)) {
-        var c = vl.t[i].c;
-        var h = ha.t[c][vl.t[i].i];
+        const c = vl.t[i].c;
+        const h = ha.t[c][vl.t[i].i];
         ha.t[c][vl.t[i].i] = ha.t[c][ha.nb[c] - 1];
         ha.nb[c] -= 1;
-        var nc_val = c_val + CVALS[c][h];
+        const nc_val = c_val + CVALS[c][h];
         var nhcard = hcard;
         var nhplay = hplay;
         var ncol = col;
@@ -323,24 +323,7 @@ fn test1() !void {
         }
     }
     try print_game(gd);
-    var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
-    try STDOUT.print("res={d}\n", .{res});
-}
-
-fn test2() !void {
-    var d: Deck = ZDECK;
-    var gd: Game = ZGAME;
-    const nb = NB_CARDS;
-    draw_deck(&d);
-    try print_deck(d);
-    for (&gd) |*h| {
-        draw_cards(&d, h, nb);
-        for (0..NB_COLORS) |i| {
-            std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
-        }
-    }
-    try print_game(gd);
-    var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
+    const res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, nb * NB_PLAYERS, false, &gd);
     try STDOUT.print("res={d}\n", .{res});
 }
 
@@ -376,12 +359,12 @@ pub fn main() !void {
                 }
             }
             //        try print_game(gd2);
-            var res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
+            const res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
             if (res > 0) succ += 1;
             //        try STDOUT.print("res={d}\n", .{res});
         }
         try STDOUT.print("succ={d}\n", .{succ});
         rotate_hand(&gd[0]);
     }
-    //    try test1();
+    try test1();
 }
