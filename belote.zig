@@ -59,7 +59,9 @@ pub fn draw_deck(d: *Deck) void {
     d.nb = ALL_CARDS;
 }
 
-pub fn deck_to_hand(d: *Deck, ha: *Hand, nb: u32) void {
+const DeckError = error{ NotIn, IsIn, NotEnough };
+pub fn deck_to_hand(d: *Deck, ha: *Hand, nb: u32) DeckError!void {
+    if (nb > d.nb) return DeckError.NotEnough;
     for (0..nb) |_| {
         const j: usize = rnd.random().int(usize) % d.nb;
         const c: Color = d.t[j].c;
@@ -80,7 +82,6 @@ pub fn one_random_from_deck(d: *Deck) Card {
     return Card{ .h = h, .c = c };
 }
 
-const DeckError = error{ NotIn, IsIn };
 pub fn remove_from_deck(d: *Deck, ca: Card) DeckError!void {
     for (0..d.nb) |j| {
         if (d.t[j] == ca) {
@@ -103,7 +104,7 @@ pub fn add_to_deck(d: *Deck, ca: Card) DeckError!void {
 }
 
 pub fn RegularToTrump(ca: Card) Card {
-    const eqv = [NB_CARDS]Vals{ 0, 1, 6, 7, 2, 3, 4, 5 };
+    const eqv = [NB_CARDS]Height{ 0, 1, 6, 7, 2, 3, 4, 5 };
     var new_ca: Card = undefined;
     new_ca.c = 0;
     new_ca.h = eqv[ca.h];
@@ -111,7 +112,7 @@ pub fn RegularToTrump(ca: Card) Card {
 }
 
 pub fn TrumpToRegular(ca: Card, c: Color) Card {
-    const eqv = [NB_CARDS]Vals{ 0, 1, 4, 5, 6, 7, 2, 3 };
+    const eqv = [NB_CARDS]Height{ 0, 1, 4, 5, 6, 7, 2, 3 };
     var new_ca: Card = undefined;
     new_ca.c = c;
     new_ca.h = eqv[ca.h];
@@ -162,16 +163,19 @@ pub fn rotate_game(g: *Game) void {
     g[NB_COLORS - 1] = ha;
 }
 
-pub fn rotate_hand(h: *Hand) void {
+pub fn rotate_hand(ha: *Hand) void {
     //const Hand = struct { nb: [NB_COLORS]u8, t: [NB_COLORS][NB_CARDS]Height };
-    const n: u8 = h.nb[0];
-    const t: [NB_CARDS]Height = h.t[0];
-    for (0..NB_COLORS - 1) |i| {
-        h.nb[i] = h.nb[i + 1];
-        h.t[i] = h.t[i + 1];
+    for (0..NB_COLORS) |c| {
+        for (0..ha.nb[c]) |j| {
+            const h = ha.t[c][j];
+            const ca = Card{ .h = h, .c = c };
+            const new_ca = switch (c) {
+                0 => TrumpToRegular(ca, 1),
+                NB_COLORS - 1 => RegularToTrump(ca),
+                else => Card{ .h = h, .c = c + 1 },
+            };
+        }
     }
-    h.nb[NB_COLORS - 1] = n;
-    h.t[NB_COLORS - 1] = t;
 }
 
 const Vals = i16;
@@ -371,7 +375,7 @@ fn test1() !void {
     draw_deck(&d);
     try print_deck(d);
     for (&gd) |*h| {
-        deck_to_hand(&d, h, nb);
+        try deck_to_hand(&d, h, nb);
         for (0..NB_COLORS) |i| {
             std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
         }
@@ -395,7 +399,7 @@ pub fn main() !void {
     var d: Deck = ZDECK;
     var gd: Game = ZGAME;
     draw_deck(&d);
-    deck_to_hand(&d, &gd[0], 5);
+    try deck_to_hand(&d, &gd[0], 5);
     const ret: Card = one_random_from_deck(&d);
     add_one_to_hand(ret, &gd[0]);
     for (0..NB_COLORS) |_| {
@@ -405,9 +409,9 @@ pub fn main() !void {
         for (0..nb) |_| {
             var d2 = d;
             var gd2 = gd;
-            deck_to_hand(&d2, &gd2[0], 2);
+            try deck_to_hand(&d2, &gd2[0], 2);
             for (1..NB_COLORS) |i| {
-                deck_to_hand(&d2, &gd2[i], 8);
+                try deck_to_hand(&d2, &gd2[i], 8);
             }
             for (&gd2) |*h| {
                 for (0..NB_COLORS) |i| {
