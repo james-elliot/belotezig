@@ -59,7 +59,7 @@ pub fn draw_deck(d: *Deck) void {
     d.nb = ALL_CARDS;
 }
 
-pub fn draw_cards(d: *Deck, ha: *Hand, nb: u32) void {
+pub fn deck_to_hand(d: *Deck, ha: *Hand, nb: u32) void {
     for (0..nb) |_| {
         const j: usize = rnd.random().int(usize) % d.nb;
         const c: Color = d.t[j].c;
@@ -69,6 +69,60 @@ pub fn draw_cards(d: *Deck, ha: *Hand, nb: u32) void {
         ha.t[c][ha.nb[c]] = h;
         ha.nb[c] += 1;
     }
+}
+
+pub fn one_random_from_deck(d: *Deck) Card {
+    const j: usize = rnd.random().int(usize) % d.nb;
+    const c: Color = d.t[j].c;
+    const h: Height = d.t[j].h;
+    d.t[j] = d.t[d.nb - 1];
+    d.nb -= 1;
+    return Card{ .h = h, .c = c };
+}
+
+const DeckError = error{ NotIn, IsIn };
+pub fn remove_from_deck(d: *Deck, ca: Card) DeckError!void {
+    for (0..d.nb) |j| {
+        if (d.t[j] == ca) {
+            d.t[j] = d.t[d.nb - 1];
+            d.nb -= 1;
+            return;
+        }
+    }
+    return DeckError.NotIn;
+}
+
+pub fn add_to_deck(d: *Deck, ca: Card) DeckError!void {
+    for (0..d.nb) |j| {
+        if (d.t[j] == ca) {
+            return DeckError.IsIn;
+        }
+    }
+    d.t[d.nb] = ca;
+    d.nb += 1;
+}
+
+pub fn RegularToTrump(ca: Card) Card {
+    const eqv = [NB_CARDS]Vals{ 0, 1, 6, 7, 2, 3, 4, 5 };
+    var new_ca: Card = undefined;
+    new_ca.c = 0;
+    new_ca.h = eqv[ca.h];
+    return new_ca;
+}
+
+pub fn TrumpToRegular(ca: Card, c: Color) Card {
+    const eqv = [NB_CARDS]Vals{ 0, 1, 4, 5, 6, 7, 2, 3 };
+    var new_ca: Card = undefined;
+    new_ca.c = c;
+    new_ca.h = eqv[ca.h];
+    return new_ca;
+}
+
+pub fn add_one_to_hand(ca: Card, ha: *Hand) void {
+    const c: Color = ca.c;
+    const h: Height = ca.h;
+    ha.t[c][ha.nb[c]] = h;
+    ha.nb[c] += 1;
 }
 
 pub fn print_deck(d: Deck) !void {
@@ -317,7 +371,7 @@ fn test1() !void {
     draw_deck(&d);
     try print_deck(d);
     for (&gd) |*h| {
-        draw_cards(&d, h, nb);
+        deck_to_hand(&d, h, nb);
         for (0..NB_COLORS) |i| {
             std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
         }
@@ -341,7 +395,9 @@ pub fn main() !void {
     var d: Deck = ZDECK;
     var gd: Game = ZGAME;
     draw_deck(&d);
-    draw_cards(&d, &gd[0], 6);
+    deck_to_hand(&d, &gd[0], 5);
+    const ret: Card = one_random_from_deck(&d);
+    add_one_to_hand(ret, &gd[0]);
     for (0..NB_COLORS) |_| {
         const nb = 10;
         var succ: u32 = 0;
@@ -349,16 +405,16 @@ pub fn main() !void {
         for (0..nb) |_| {
             var d2 = d;
             var gd2 = gd;
-            draw_cards(&d2, &gd2[0], 2);
+            deck_to_hand(&d2, &gd2[0], 2);
             for (1..NB_COLORS) |i| {
-                draw_cards(&d2, &gd2[i], 8);
+                deck_to_hand(&d2, &gd2[i], 8);
             }
             for (&gd2) |*h| {
                 for (0..NB_COLORS) |i| {
                     std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
                 }
             }
-            //        try print_game(gd2);
+            //            try print_game(gd2);
             const res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
             if (res > 0) succ += 1;
             //        try STDOUT.print("res={d}\n", .{res});
