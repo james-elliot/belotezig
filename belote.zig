@@ -73,6 +73,13 @@ pub fn deck_to_hand(d: *Deck, ha: *Hand, nb: u32) DeckError!void {
     }
 }
 
+pub fn add_to_hand(ha: *Hand, ca: Card) void {
+    const h = ca.h;
+    const c = ca.c;
+    ha.t[c][ha.nb[c]] = h;
+    ha.nb[c] += 1;
+}
+
 pub fn one_random_from_deck(d: *Deck) Card {
     const j: usize = rnd.random().int(usize) % d.nb;
     const c: Color = d.t[j].c;
@@ -155,27 +162,29 @@ pub fn print_game(g: Game) !void {
     }
 }
 
-pub fn rotate_game(g: *Game) void {
-    const ha: Hand = g[0];
-    for (0..NB_COLORS - 1) |i| {
-        g[i] = g[i + 1];
-    }
-    g[NB_COLORS - 1] = ha;
-}
-
-pub fn rotate_hand(ha: *Hand) void {
-    //const Hand = struct { nb: [NB_COLORS]u8, t: [NB_COLORS][NB_CARDS]Height };
+pub fn rotate_hand(d: *Deck, ha: *Hand) !void {
+    var list = std.ArrayList(Card).init(ALLOCATOR);
+    defer list.deinit();
     for (0..NB_COLORS) |c| {
         for (0..ha.nb[c]) |j| {
             const h = ha.t[c][j];
-            const ca = Card{ .h = h, .c = c };
+            const ca = Card{ .h = h, .c = @intCast(c) };
+            //            try STDOUT.print("h={d} c={d}\n", .{ h, c });
+            try add_to_deck(d, ca);
             const new_ca = switch (c) {
                 0 => TrumpToRegular(ca, 1),
                 NB_COLORS - 1 => RegularToTrump(ca),
-                else => Card{ .h = h, .c = c + 1 },
+                else => Card{ .h = h, .c = @intCast(c + 1) },
             };
+            try list.append(new_ca);
         }
+        ha.nb[c] = 0;
     }
+    for (list.items) |ca| {
+        try remove_from_deck(d, ca);
+        add_to_hand(ha, ca);
+    }
+    //
 }
 
 const Vals = i16;
@@ -405,6 +414,7 @@ pub fn main() !void {
     for (0..NB_COLORS) |_| {
         const nb = 10;
         var succ: u32 = 0;
+        var sum: i32 = 0;
         try print_game(gd);
         for (0..nb) |_| {
             var d2 = d;
@@ -418,13 +428,18 @@ pub fn main() !void {
                     std.sort.insertion(Height, h.t[i][0..h.nb[i]], {}, cmpByValue);
                 }
             }
-            //            try print_game(gd2);
-            const res = ab(-1, 1, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, false, &gd2);
-            if (res > 0) succ += 1;
-            //        try STDOUT.print("res={d}\n", .{res});
+            try print_game(gd2);
+            const res = ab(-1, 162, 0, 0, 0, 0, false, 0, 0, 0, 0, 32, true, &gd2);
+            if (res > 0) {
+                succ += 1;
+                sum += res;
+            } else {
+                sum -= 162;
+            }
+            try STDOUT.print("res={d}\n", .{res});
         }
-        try STDOUT.print("succ={d}\n", .{succ});
-        rotate_hand(&gd[0]);
+        try STDOUT.print("succ={d} sum={d}\n", .{ succ, @as(f32, @floatFromInt(sum)) / nb });
+        try rotate_hand(&d, &gd[0]);
     }
-    try test1();
+    //    try test1();
 }
